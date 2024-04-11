@@ -1,0 +1,187 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Tu Página con DataTables</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/2.0.2/css/dataTables.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/2.0.2/js/dataTables.min.js"></script>
+</head>
+<body>
+    <table id="mitabla" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Id de usuario</th>
+                <th>Nombre</th>
+                <th>Orden</th>
+            </tr>
+        </thead>
+    </table>
+    <div class="mb-3">
+        <button type="button" class="btn btn-success" id="btnAgregar">Agregar registro</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let table = new DataTable('#mitabla', {
+                "processing": true,
+                "serverSide": true,
+                "ajax": {
+                    "url": "/TiposCuentas/GetDatosPaginados", // Asegúrate de que esta sea la ruta correcta a tu API
+                    "type": "GET",
+                    "data": function (d) {
+                        return $.extend({}, d, {
+                            "page": (d.start / d.length) + 1,
+                            "pageSize": d.length
+                        });
+                    }
+                },
+                "columns": [
+                    { "data": "Id" },
+                    { "data": "UsuarioId" },
+                    { "data": "Nombre" },
+                    { "data": "Orden" },
+
+                    {
+                        "data": null,
+                        "defaultContent": '<button class="btn btn-primary btnEditar">Editar</button> <button class="btn btn-danger btnEliminar">Eliminar</button>'
+                    }
+                ],
+                "searching": false // Esto oculta el cuadro de búsqueda
+            });
+
+            // Evento para el botón Agregar
+            $('#btnAgregar').on('click', function () {
+                // Añadir una nueva fila al final de la tabla
+                var newRow = $('<tr>');
+                newRow.append('<td></td>'); // Id estará vacío porque es un nuevo registro
+                newRow.append('<td><input type="text" name="UsuarioId" class="form-control" /></td>');
+                newRow.append('<td><input type="text" name="Nombre" class="form-control" /></td>');
+                newRow.append('<td><input type="text" name="Orden" class="form-control" /></td>');
+                newRow.append('<td><button class="btn btn-primary btnSave">Guardar</button> <button class="btn btn-secondary btnCancelSave">Cancelar</button></td>');
+
+                // Agregar la nueva fila a la tabla
+                $('#mitabla tbody').append(newRow);
+            });
+
+            $('#mitabla tbody').on('click', '.btnSave', function () {
+                var row = $(this).closest('tr');
+                var data = {
+                    UsuarioId: row.find('input[name="UsuarioId"]').val(),
+                    Nombre: row.find('input[name="Nombre"]').val(),
+                    Orden: row.find('input[name="Orden"]').val()
+                };
+
+
+                // Envía los datos al servidor usando AJAX
+                $.ajax({
+                    url: '/TiposCuentas/Create', // Asegúrate de que la URL sea correcta
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                    success: function (response) {
+                        // Si el servidor procesa los datos correctamente, recarga la página o redirige
+                        window.location.href = '/TiposCuentas/AllTiposCuentas';
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        // Manejo de errores
+                        alert('Error al guardar: ' + thrownError);
+                    }
+                });
+            });
+
+            $('#mitabla tbody').on('click', '.btnCancelSave', function () {
+                $(this).closest('tr').remove(); // Simplemente elimina la fila
+            });
+
+
+            // Evento para el botón Editar
+            $('#mitabla tbody').on('click', '.btnEditar', function () {
+                var row = $(this).closest('tr');
+                var id = row.find('td:eq(0)').text(); // Asumiendo que la columna 0 tiene el ID
+                var nombre = row.find('td:eq(2)').text(); // Asumiendo que la columna 2 tiene el Nombre
+
+                // Convertir el campo de nombre en un input
+                row.find('td:eq(2)').html('<input type="text" name="Nombre" class="form-control" value="' + nombre + '">');
+
+                // Cambiar el botón Editar por los botones Guardar y Cancelar
+                row.find('td:eq(4)').html('<button class="btnGuardar btn btn-primary">Guardar</button> <button class="btnCancelar btn btn-secondary">Cancelar</button>');
+            });
+
+            // Evento para el botón Guardar
+            $('#mitabla tbody').on('click', '.btnGuardar', function () {
+                var row = $(this).closest('tr');
+                var id = row.find('td:eq(0)').text(); // Obtiene el ID
+                var nombre = row.find('input[name="Nombre"]').val(); // Obtiene el valor del nombre
+
+                // Crear el objeto de datos para enviar al servidor
+                var data = {
+                    Id: id,
+                    Nombre: nombre
+                };
+
+                // Envía los datos al servidor usando AJAX
+                $.ajax({
+                    url: '/TiposCuentas/Actualizar', // Asegúrate de que la URL sea correcta
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                    success: function (response) {
+                        // Actualizar la UI con el nuevo nombre
+                        row.find('td:eq(2)').text(nombre);
+
+                        // Restablecer los botones originales
+                        row.find('td:eq(4)').html('<button class="btnEditar btn btn-primary">Editar</button> <button class="btnEliminar btn btn-danger">Eliminar</button>');
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        // Manejo de errores
+                        alert('Error al actualizar: ' + thrownError);
+                    }
+                });
+            });
+
+            // Evento para el botón Cancelar
+            $('#mitabla tbody').on('click', '.btnCancelar', function () {
+                var row = $(this).closest('tr');
+                var originalNombre = row.find('input[name="Nombre"]').attr('value'); // Obtiene el valor original
+
+                // Revertir el input a texto estático
+                row.find('td:eq(2)').text(originalNombre);
+
+                // Restablecer los botones originales
+                row.find('td:eq(4)').html('<button class="btnEditar btn btn-primary">Editar</button> <button class="btnEliminar btn btn-danger">Eliminar</button>');
+            });
+
+
+            // Evento para el botón Borrar
+            $('#mitabla tbody').on('click', '.btnEliminar', function () {
+                var row = $(this).closest('tr');
+                var id = row.find('td:eq(0)').text(); // Obtiene el ID
+                var usuarioId = row.find('td:eq(1)').text(); // Obtiene el ID
+
+                // Confirmar con el usuario si realmente desea borrar
+                if (confirm('¿Estás seguro de que quieres borrar este tipo de cuenta?')) {
+                    // Envía la solicitud de borrado al servidor usando AJAX
+                    $.ajax({
+                        url: '/TiposCuentas/BorrarTipoCuenta', // Asegúrate de que la URL sea correcta
+                        type: 'POST',
+                        data: {
+                            id: id,
+                            UsuarioId: usuarioId
+                        }, // Enviar el ID como parte de los datos
+                        success: function (response) {
+                            // Si el servidor procesa el borrado correctamente, elimina la fila de la tabla
+                            table.row(row).remove().draw();
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            // Manejo de errores
+                            alert('Error al borrar: ' + thrownError);
+                        }
+                    });
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
